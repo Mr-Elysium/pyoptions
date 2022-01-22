@@ -44,7 +44,7 @@ def riskfree():
 
 class Call:
     def __init__(self, strike, experation, stock = None, price = None):
-        self.S = strike
+        self.K = strike
         self.exp = experation
         if stock:
             self.stock = stock
@@ -52,12 +52,12 @@ class Call:
             self.price = price
 
 
-    def price(self, K, sigma, T = None, r = None):
+    def price(self, S, sigma, T = None, r = None):
         if not T:
             T = (self.exp - date.today()).days/365
         if not r:
             r = riskfree()
-        S = self.S
+        K = self.K
 
         d1 = (log(S / K) + (r + (sigma ** 2) / 2) * T) / (sigma * sqrt(T))
         d2 = d1 - sigma * sqrt(T)
