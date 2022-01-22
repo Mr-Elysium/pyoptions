@@ -6,6 +6,8 @@ from bs4 import BeautifulSoup
 from constants import *
 
 from scipy.interpolate import interp1d
+from datetime import datetime, date, timedelta
+from time import mktime, sleep
 from math import sqrt, log, exp
 from scipy.stats import norm
 from scipy.optimize import fsolve
@@ -39,4 +41,27 @@ def riskfree():
     # If scraping treasury data fails use the constant fallback risk free rate
     except Exception:
         return lambda x: FALLBACK_RISK_FREE_RATE
+
+class Call:
+    def __init__(self, strike, experation, stock = None, price = None):
+        self.S = strike
+        self.exp = experation
+        if stock:
+            self.stock = stock
+        if price:
+            self.price = price
+
+
+    def price(self, K, sigma, T = None, r = None):
+        if not T:
+            T = (self.exp - date.today()).days/365
+        if not r:
+            r = riskfree()
+        S = self.S
+
+        d1 = (log(S / K) + (r + (sigma ** 2) / 2) * T) / (sigma * sqrt(T))
+        d2 = d1 - sigma * sqrt(T)
+        return S * norm.cdf(d1) - K * norm.cdf(d2)
+
+
 
