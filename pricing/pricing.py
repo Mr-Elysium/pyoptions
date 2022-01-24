@@ -44,26 +44,37 @@ def riskfree():
     except Exception:
         return lambda x: FALLBACK_RISK_FREE_RATE
 
+# S = Stock price
+# K = Strike price
+# T = Time to experation in years (Input: Number of days or string: 'dd-mm-yyyy')
+# r = Risk free rate over lifetime option
+# sigma = (Implied) Volatility over lifetime option
 class Call:
-    def __init__(self, strike, experation, stock = None, price = None):
+    def __init__(self, spot, strike, experation, sigma = None, price = None):
+        if (type(spot) == string)
+            # TODO Import from yfinance
+            pass
+        else:
+            self.S = spot
         self.K = strike
-        self.exp = experation
-        if stock:
-            self.stock = stock
+        if (type(experation) == string):
+            self.T = (datetime.strptime(experation, DATE_FORMAT) - datetime.today()).days/365
+        else:
+            self.T = experation/365
+        self.r = riskfree()(self.T)
+        if sigma:
+            self.sigma = sigma
+            self.price = price()
         if price:
-            self.price = price
+            self.optprice = price
+            self.sigma = IV()
 
-
-    def price(self, S, sigma, T = None, r = None):
-        if not T:
-            T = (self.exp - date.today()).days/365
-        if not r:
-            r = riskfree()
-        K = self.K
-
+    def price(self, S = self.S, K = self.K, T = self.T, r = self.r, sigma = self.sigma):
         d1 = (log(S / K) + (r + (sigma ** 2) / 2) * T) / (sigma * sqrt(T))
         d2 = d1 - sigma * sqrt(T)
         return S * norm.cdf(d1) - K * norm.cdf(d2)
 
-
-
+    def IV(self, optprice = self.optprice)
+        impvol = lambda x: self.price(sigma = x) - optprice
+        iv = fsolve(impvol, SOLVER_STARTING_VALUE, fprime=self._fprime, xtol=IMPLIED_VOLATILITY_TOLERANCE)
+        return iv[0]
