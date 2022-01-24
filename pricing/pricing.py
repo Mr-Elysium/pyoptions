@@ -12,6 +12,8 @@ from math import sqrt, log, exp
 from scipy.stats import norm
 from scipy.optimize import fsolve
 
+# Imports current treasury rates and extrapolates to continuous time
+# Returns riskfree rate function
 def riskfree():
     try:
         r = requests.get(TREASURY_URL)
