@@ -44,11 +44,14 @@ def riskfree():
     except Exception:
         return lambda x: FALLBACK_RISK_FREE_RATE
 
-# S = Stock price
+# S = Stock price (Input: Stock symbol string or arbitrary number)
 # K = Strike price
 # T = Time to experation in years (Input: Number of days or string: 'dd-mm-yyyy')
 # r = Risk free rate over lifetime option
+#
+# 
 # sigma = (Implied) Volatility over lifetime option
+# price = Option spot price
 class Call:
     def __init__(self, spot, strike, experation, sigma = None, price = None):
         if (type(spot) == string)
