@@ -54,30 +54,42 @@ def riskfree():
 # price = Option spot price
 class Call:
     def __init__(self, spot, strike, experation, sigma = None, price = None):
-        if (type(spot) == string)
+        if (type(spot) == str):
             # TODO Import from yfinance
             pass
         else:
             self.S = spot
         self.K = strike
-        if (type(experation) == string):
+        if (type(experation) == str):
             self.T = (datetime.strptime(experation, DATE_FORMAT) - datetime.today()).days/365
         else:
             self.T = experation/365
         self.r = riskfree()(self.T)
         if sigma:
             self.sigma = sigma
-            self.price = price()
+            self.price = self.price()
         if price:
             self.optprice = price
-            self.sigma = IV()
+            self.sigma = self.IV()
 
-    def price(self, S = self.S, K = self.K, T = self.T, r = self.r, sigma = self.sigma):
+    def price(self, S=None, K=None, T=None, r=None, sigma=None):
+        if not S:
+            S = self.S
+        if not K:
+            K = self.K
+        if not T:
+            T = self.T
+        if not r:
+            r = self.r
+        if not sigma:
+            sigma = self.sigma
         d1 = (log(S / K) + (r + (sigma ** 2) / 2) * T) / (sigma * sqrt(T))
         d2 = d1 - sigma * sqrt(T)
         return S * norm.cdf(d1) - K * norm.cdf(d2)
 
-    def IV(self, optprice = self.optprice)
+    def IV(self, optprice = None):
+        if not optprice:
+            optprice = self.optprice
         impvol = lambda x: self.price(sigma = x) - optprice
         iv = fsolve(impvol, SOLVER_STARTING_VALUE, fprime=self._fprime, xtol=IMPLIED_VOLATILITY_TOLERANCE)
         return iv[0]
