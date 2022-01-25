@@ -87,9 +87,16 @@ class Call:
         d2 = d1 - sigma * sqrt(T)
         return S * norm.cdf(d1) - K * norm.cdf(d2)
 
+    def _fprime(self, sigma):
+        logSoverK = log(self.S/self.K)
+        n12 = ((self.r + sigma**2/2)*self.T)
+        numerd1 = logSoverK + n12
+        d1 = numerd1/(sigma*sqrt(self.T))
+        return self.S*sqrt(self.T)*norm.pdf(d1)*exp(-self.r*self.T)
+
     def IV(self, optprice = None):
         if not optprice:
             optprice = self.optprice
-        impvol = lambda x: self.price(sigma = x) - optprice
+        impvol = lambda x: self.price(sigma=x) - optprice
         iv = fsolve(impvol, SOLVER_STARTING_VALUE, fprime=self._fprime, xtol=IMPLIED_VOLATILITY_TOLERANCE)
         return iv[0]
