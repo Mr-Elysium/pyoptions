@@ -78,6 +78,7 @@ class Call:
             if not optprice:
                 self.optprice = self.calcprice
 
+    # Calculate options price with Black & Scholes formula
     def price(self, S=None, K=None, T=None, r=None, sigma=None):
         if not S:
             S = self.S
@@ -93,6 +94,7 @@ class Call:
         d2 = d1 - sigma * sqrt(T)
         return S * norm.cdf(d1) - K * norm.cdf(d2)
 
+    # Calculate Implied Volatility
     def _fprime(self, sigma):
         logSoverK = log(self.S/self.K)
         n12 = ((self.r + sigma**2/2)*self.T)
