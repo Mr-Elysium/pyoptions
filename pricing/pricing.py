@@ -48,12 +48,12 @@ def riskfree():
 # K = Strike price
 # T = Time to experation in years (Input: Number of days or string: 'dd-mm-yyyy')
 # r = Risk free rate over lifetime option
-#
 # 
+# Either sigma or optprice ought to be given, one will be derived from the other
 # sigma = (Implied) Volatility over lifetime option
 # price = Option spot price
 class Call:
-    def __init__(self, spot, strike, experation, sigma = None, price = None):
+    def __init__(self, spot, strike, experation, sigma = None, calcprice = None, optprice = None):
         if (type(spot) == str):
             # TODO Import from yfinance
             pass
@@ -65,12 +65,18 @@ class Call:
         else:
             self.T = experation/365
         self.r = riskfree()(self.T)
+        if not sigma and not optprice:
+            raise Exception("Either sigma or optprice ought to be given.")
+        if optprice:
+            self.optprice = optprice
+            if not sigma:
+                self.sigma = self.IV()
+            self.calcprice = self.price()
         if sigma:
             self.sigma = sigma
-            self.price = self.price()
-        if price:
-            self.optprice = price
-            self.sigma = self.IV()
+            self.calcprice = self.price()
+            if not optprice:
+                self.optprice = self.calcprice
 
     def price(self, S=None, K=None, T=None, r=None, sigma=None):
         if not S:
