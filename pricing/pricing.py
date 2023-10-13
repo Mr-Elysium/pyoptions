@@ -1,21 +1,51 @@
-import requests
-import xml.etree.ElementTree as ET
-
-from dataclasses import dataclass, InitVar, field
+from dataclasses import InitVar
 from datetime import datetime, timedelta
 from math import sqrt, log, exp
 
-# import matplotlib.pyplot as plt
-import numpy as np
-
-from scipy.interpolate import interp1d
-from scipy.optimize import fsolve
 from scipy.stats import norm
 
 from constants import *
 
 def riskfree():
     return FALLBACK_RISK_FREE_RATE
+
+# Calculate options price with Black Scholes formula
+def price(option, K=None, S=None, T=None, sigma=None, r=None):
+    if not K:
+        K=option.K
+    if not S:
+        S=option.S
+    if not T:
+        T=option.T
+    if not sigma:
+        sigma=option.sigma
+    if not r:
+        r=option.r
+
+    d1 = (log(S / K) + (r + (sigma ** 2) / 2) * T) / (sigma * sqrt(T))
+    d2 = d1 - sigma * sqrt(T)
+    if option.side == "call":
+        return max(S * norm.cdf(d1) - K * exp(-r * T) * norm.cdf(d2), 0)
+    if option.side == "put":
+        return max(K * exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1), 0)
+
+# Calculate Implied Volatility
+def IV(option, option_price=None):
+    if not option_price:
+        option_price=option.spot_price
+
+    sigma = SOLVER_STARTING_VALUE
+    epsilon = IMPLIED_VOLATILITY_TOLERANCE
+
+    def newton_raphson(option, sigma, epsilon):
+        diff = abs(price(option, sigma=sigma) - option_price)
+        while diff > epsilon:
+            sigma = (sigma - (price(option, sigma=sigma) - option_price) / max((option.vega(sigma=sigma) * 100), 100))
+            diff = abs(price(option, sigma=sigma) - option_price)
+        return sigma
+
+    iv = newton_raphson(option, sigma, epsilon)
+    return iv
 
 # S = Stock price (Input: Stock symbol string or arbitrary number)
 # K = Strike price
@@ -24,12 +54,9 @@ def riskfree():
 #
 # Either sigma or option price ought to be given, one will be derived from the other
 # sigma = (Implied) Volatility over lifetime option in decimal percent (30% --> 0.3)
-# price = Option spot price
-# @dataclass
+# spot_price = Option spot price
 class option:
-    S = None
-
-    def __init__(self, side: str, K:float, S: float = None, T: float = None, expiration: str = None, sigma: float = None, option_price: float = None, r: float = None, stock: InitVar[str] = None):
+    def __init__(self, side: str, K:float, S: float = None, T: float = None, expiration: str = None, sigma: float = None, spot_price: float = None, r: float = None, stock: InitVar[str] = None):
         self.side = side
         self.K = K
 
@@ -48,40 +75,26 @@ class option:
             self.expiration = datetime.strftime(datetime.today() + timedelta(days=int(T)), DATE_FORMAT)
             self.T = T / 365
 
-        if sigma and not option_price:
-            self.option_price = None
-            self.sigma = sigma
-        elif option_price and not sigma:
-            self.option_price = option_price
-            self.sigma = None
-        elif not sigma and not option_price:
-            raise Exception("Either option price or volatility sigma must be given")
         self.r = float(riskfree())
 
-    # Calculate options price with Black & Scholes formula
-    def price(self, S=self.S, T=self.T, sigma=self.sigma, r=self.r):
-        d1 = (log(S / self.K) + (r + (sigma ** 2) / 2) * T) / (sigma * sqrt(T))
-        d2 = d1 - sigma * sqrt(T)
-        if self.side == "call":
-            return max(S * norm.cdf(d1) - self.K * exp(-r * T) * norm.cdf(d2), 0)
-        if self.side == "put":
-            return max(self.K * exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1), 0)
+        if not sigma and not spot_price:
+            raise Exception("Either option price or volatility sigma must be given")
+        if not sigma:
+            self.spot_price = spot_price
+            self.sigma = IV(self)
+        if not spot_price:
+            self.sigma = sigma
+            self.spot_price=price(self)
 
-    # Calculate Implied Volatility
-    def IV(self, option_price=None):
-        if not option_price:
-            option_price = self.option_price
+    def option_price(self):
+        if self.spot_price:
+            return self.spot_price
+        return price(self)
 
-        def _fprime(self, sigma):
-            logSolverK = log(self.S / self.K)
-            n12 = ((self.r + sigma ** 2 / 2) * self.T)
-            number1 = logSolverK + n12
-            d1 = number1 / (sigma * sqrt(self.T))
-            return self.S * sqrt(self.T) * norm.pdf(d1) * exp(-self.r * self.T)
-
-        impvol = lambda x: price(self, sigma=x) - option_price
-        iv = fsolve(impvol, SOLVER_STARTING_VALUE, fprime=_fprime, xtol=IMPLIED_VOLATILITY_TOLERANCE)
-        return iv[0]
+    def iv(self):
+        if self.sigma:
+            return self.sigma
+        return IV(self)
 
     def delta(self):
         h = DELTA_DIFFERENTIAL
@@ -96,10 +109,12 @@ class option:
         p3 = price(self, S=self.S - h)
         return (p1 - 2 * p2 + p3) / (h ** 2)
 
-    def vega(self):
+    def vega(self, sigma=None):
+        if not sigma:
+            sigma=option.sigma
         h = VEGA_DIFFERENTIAL
-        p1 = price(self, sigma=self.sigma + h)
-        p2 = price(self, sigma=self.sigma - h)
+        p1 = price(self, sigma=sigma + h)
+        p2 = price(self, sigma=sigma - h)
         return (p1 - p2) / (2 * h * 100)
 
     def theta(self):
@@ -113,5 +128,3 @@ class option:
         p1 = price(self, r=self.r + h)
         p2 = price(self, r=self.r - h)
         return (p1 - p2) / (2 * h * 100)
-
-a = option(side='call', K=28000, S=28275, T=47.75, option_price=1575)
