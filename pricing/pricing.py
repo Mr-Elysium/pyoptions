@@ -1,11 +1,9 @@
+from pricing.constants import *
+
 from datetime import datetime, timedelta
 
-from scipy.stats import norm
-
-# from pricing.constants import *
-from constants import *
-
 import numpy as np
+from scipy.stats import norm
 
 def riskfree():
     return FALLBACK_RISK_FREE_RATE
@@ -56,7 +54,7 @@ def binomial_tree_price(option, K=None, S=None, T=None, sigma=None, r=None, div=
     dp = 1 - up
     df = np.exp(-(r - div) * dt)
 
-    # Initialize terminal price nodes to zeros
+    # Initialize terminal price nodes
     STs = [np.array([S])]
 
     # Calculate expected stock prices for each node
@@ -82,7 +80,7 @@ def binomial_tree_price(option, K=None, S=None, T=None, sigma=None, r=None, div=
 
     return payoffs[0]
 
-# Calculate Implied Volatility
+# Calculate Implied Volatility using newton raphson
 def calculate_implied_volatility(option, option_price=None):
     if not option_price:
         option_price=option.spot_price
@@ -91,25 +89,33 @@ def calculate_implied_volatility(option, option_price=None):
     epsilon = IMPLIED_VOLATILITY_TOLERANCE
 
     def newton_raphson(option, sigma, epsilon):
-        diff = abs(blackscholes_price(option, sigma=sigma) - option_price)
+        diff = abs(option.option_price(sigma=sigma) - option_price)
         while diff > epsilon:
-            sigma = (sigma - (blackscholes_price(option, sigma=sigma) - option_price) / max((option.vega(sigma=sigma) * 100), 100))
-            diff = abs(blackscholes_price(option, sigma=sigma) - option_price)
+            sigma = (sigma - (option.option_price(sigma=sigma) - option_price) / max((option.vega(sigma=sigma) * 100), 100))
+            diff = abs(option.option_price(sigma=sigma) - option_price)
         return sigma
 
     iv = newton_raphson(option, sigma, epsilon)
     return iv
 
+# side = Option side/type either "call" or "put"
+# is_european = Option type, either european (True) or american (False)
 # S = Stock price (Input: Stock symbol string or arbitrary number)
 # K = Strike price
-# T = Time to experation in years (Input: Number of years or string: 'dd-mm-yyyy')
-# r = Risk free rate over lifetime option
+# r = Annualised risk-free rate
+# div = Annualised dividend of underlying
+# pricing_model = Method of calculating option price, either "binomial" or "blackscholes"
 #
-# Either sigma or option price ought to be given, one will be derived from the other
+# Either expiration or T must be given, one will be derived from the other, both cannot be given
+# expiration = Expiration date, input as string: 'dd-mm-yyyy'
+# T = Time to expiration in years, input number of years
+#
+# Either sigma or option price ought to be given, one will be derived from the other, both cannot be given
 # sigma = (Implied) Volatility over lifetime option in decimal percent (30% --> 0.3)
 # spot_price = Option spot price
 class option:
-    def __init__(self, side: str, is_european: bool, K:float, S: float, T: float = None, expiration: str = None, sigma: float = None, spot_price: float = None, r: float = None, div: float = None, pricing_model: str = None, periods: int = 30):
+    # Initialise option variables
+    def __init__(self, side: str, is_european: bool, K:float, S: float, T: float = None, expiration: str = None, sigma: float = None, spot_price: float = None, r: float = None, div: float = None, pricing_model: str = None, periods: int = None):
         if not side:
             raise Exception("Option side must be given, either 'call' or 'put'")
         self.side = side
@@ -125,13 +131,14 @@ class option:
 
         if not expiration and not T:
             raise Exception("Either expiration date or time to expiration in years must be given.")
-        if expiration:
-            self.T = (datetime.strptime(expiration, DATE_FORMAT) - datetime.today()).days / 365
-        elif not T:
-            raise Exception("Either expiration date or time to expiration in years must be given.")
-        else:
+        elif expiration and not T:
+            time_difference = datetime.strptime(expiration, DATE_FORMAT) - datetime.today()
+            self.T = (time_difference.days + time_difference.seconds / 86400) / 365
+        elif T and not expiration:
             self.expiration = datetime.strftime(datetime.today() + timedelta(days=T*365), DATE_FORMAT)
             self.T = T
+        else:
+            raise Exception("You cannot set both T and expiration, this will create a discrepancy in the calculation of T")
 
         if not r:
             self.r = float(riskfree())
@@ -141,6 +148,11 @@ class option:
             self.div = 0
         else:
             self.div = div
+
+        if not periods:
+            self.periods = 30
+        else:
+            self.periods = periods
 
         if not pricing_model:
             self.pricing_model = "blackscholes"
@@ -163,7 +175,8 @@ class option:
         else:
             raise Exception("You cannot set both spot_price and volatility sigma, this will create a discrepancy in the pricing.")
 
-    def option_price(self, K=None, S=None, T=None, sigma=None, r=None, div=None, periods=30):
+    # Basic option price function, uses pricing_model to calculate price
+    def option_price(self, K=None, S=None, T=None, sigma=None, r=None, div=None, periods=None):
         if not K:
             K = self.K
         if not S:
@@ -176,13 +189,18 @@ class option:
             r = self.r
         if not div:
             div = self.div
+        if not periods:
+            periods = self.periods
 
+        if self.pricing_model == "blackscholes" and self.is_european == False:
+            raise Exception("You cannot price american options using the blackscholes pricing model")
         if self.pricing_model == "blackscholes":
             return blackscholes_price(self, K, S, T, sigma, r, div)
         if self.pricing_model == "binomial":
             return binomial_tree_price(self, K=K, S=S, T=T, sigma=sigma, r=r, div=div, periods=periods)
         raise Exception("Invalid pricing model, must be 'blackscholes' or 'binomial'")
 
+    # Pricing function using blackscholes
     def blackscholes_option_price(self, K=None, S=None, T=None, sigma=None, r=None, div=None):
         if not K:
             K = self.K
@@ -198,10 +216,11 @@ class option:
             div = self.div
 
         if not self.is_european:
-            raise Exception("You cannot price options using the blackscholes pricing model")
+            raise Exception("You cannot price american options using the blackscholes pricing model")
         return blackscholes_price(self, K, S, T, sigma, r, div)
 
-    def binomial_option_price(self, K=None, S=None, T=None, sigma=None, r=None, div=None, periods=30):
+    # Pricing function using binomial tree
+    def binomial_option_price(self, K=None, S=None, T=None, sigma=None, r=None, div=None, periods=None):
         if not K:
             K = self.K
         if not S:
@@ -214,12 +233,16 @@ class option:
             r = self.r
         if not div:
             div = self.div
+        if not periods:
+            periods = self.periods
 
         return binomial_tree_price(self, K, S, T, sigma, r, div, periods)
 
+    # Calculate implied volatility
     def implied_volatility(self):
         return calculate_implied_volatility(self)
 
+    # Calculate delta
     def delta(self, S=None):
         if not S:
             S=self.S
@@ -228,6 +251,7 @@ class option:
         p2 = self.option_price(S=S - h)
         return (p1 - p2) / (2 * h)
 
+    # Calculate gamma
     def gamma(self, S=None):
         if not S:
             S=self.S
@@ -237,6 +261,7 @@ class option:
         p3 = self.option_price(S=S - h)
         return (p1 - 2 * p2 + p3) / np.power(h, 2)
 
+    # Calculate vega
     def vega(self, sigma=None):
         if not sigma:
             sigma=self.sigma
@@ -245,17 +270,16 @@ class option:
         p2 = self.option_price(sigma=sigma - h)
         return (p1 - p2) / (2 * h * 100)
 
+    # Calculate theta
     def theta(self):
         h = THETA_DIFFERENTIAL
         p1 = self.option_price(T=self.T + h)
         p2 = self.option_price(T=self.T - h)
         return (p1 - p2) / (2 * h * 365)
 
+    # Calculate rho
     def rho(self):
         h = RHO_DIFFERENTIAL
         p1 = self.option_price(r=self.r + h)
         p2 = self.option_price(r=self.r - h)
         return (p1 - p2) / (2 * h * 100)
-
-a = option("call", True, 26000, S=25000, T=1/52, sigma=0.5, pricing_model="blackscholes")
-print(a.delta())
