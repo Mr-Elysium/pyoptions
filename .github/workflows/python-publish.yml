@@ -6,88 +6,34 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Publish python package to PyPI
+name: Upload Python Package to PyPI
 
-on: push
-
-permissions:
-  contents: read
+on:
+  release:
+    types: [created]
+  workflow_dispatch: {}
 
 jobs:
-  build:
-    name: Build distribution
+  deploy:
+    name: Deploy
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.x"
+      - uses: actions/checkout@v3
 
-    - name: Install pypa/build
-      run: >-
-        python3 -m
-        pip install
-        build
-        --user
-    - name: Build a binary wheel and a source tarball
-      run: python3 -m build
-    - name: Store the distribution packages
-      uses: actions/upload-artifact@v3
-      with:
-        name: python-package-distributions
-        path: dist/
+      - name: set up python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
-  publish-to-pypi:
-    name: >-
-      Publish Python distribution to PyPI
-    if: startsWith(github.ref, 'refs/tags/')
-    needs:
-    - build
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/stockoption
-    permissions:
-      id-token: write
-
-    steps:
-    - name: Download all the dists
-      uses: actions/download-artifacts@v3
-      with:
-        name: python-package-distribution
-        path: dist/
-    - name: Publish distribution to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-
-  github-release:
-    name: >-
-      Sign the Python distribution with Sigstore and upload them to GitHub Release
-    needs:
-    - publish-to-pypi
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-      id-token: write
-
-    steps:
-    - name: Download all the dists
-      uses: actions/download-artifacts@v3
-      with:
-        name: python-package-distributions
-        path: dist/
-    - name: Sign the dists with Sigstore
-      uses: sigstore/gh-action-sigstore-python@v1.2.3
-      with:
-        inputs: >-
-          ./dist/*.tar.gz
-          ./dist/*.whl
-    - name: Upload artifact signatures to GitHub Release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      run: >-
-        gh release upload
-        '${{ github.ref_name }}' dist/**
-        --repo '${{ github.repository }}'
+      - name: build
+        run: |
+          pip install virtualenv
+          virtualenv -p /usr/bin/python .venv
+          source .venv/bin/activate
+          pip install -U twine build packaging
+          python -m build
+          twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
