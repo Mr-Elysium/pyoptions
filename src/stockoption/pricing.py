@@ -1,4 +1,4 @@
-from pricing.constants import *
+from src.stockoption._constants import *
 
 from datetime import datetime, timedelta
 
@@ -157,7 +157,7 @@ class option:
         if not pricing_model:
             self.pricing_model = "blackscholes"
         elif pricing_model != "blackscholes" and pricing_model != "binomial":
-            raise Exception("Invalid pricing model, must be 'blackscholes' or 'binomial'")
+            raise Exception("Invalid stockoption model, must be 'blackscholes' or 'binomial'")
         else:
             self.pricing_model = pricing_model
 
@@ -173,7 +173,7 @@ class option:
             if self.pricing_model == "binomial":
                 self.spot_price = binomial_tree_price(self, K, S, T, sigma, r, div, periods=periods)
         else:
-            raise Exception("You cannot set both spot_price and volatility sigma, this will create a discrepancy in the pricing.")
+            raise Exception("You cannot set both spot_price and volatility sigma, this will create a discrepancy in the stockoption.")
 
     # Basic option price function, uses pricing_model to calculate price
     def option_price(self, K=None, S=None, T=None, sigma=None, r=None, div=None, periods=None):
@@ -193,12 +193,12 @@ class option:
             periods = self.periods
 
         if self.pricing_model == "blackscholes" and self.is_european == False:
-            raise Exception("You cannot price american options using the blackscholes pricing model")
+            raise Exception("You cannot price american options using the blackscholes stockoption model")
         if self.pricing_model == "blackscholes":
             return blackscholes_price(self, K, S, T, sigma, r, div)
         if self.pricing_model == "binomial":
             return binomial_tree_price(self, K=K, S=S, T=T, sigma=sigma, r=r, div=div, periods=periods)
-        raise Exception("Invalid pricing model, must be 'blackscholes' or 'binomial'")
+        raise Exception("Invalid stockoption model, must be 'blackscholes' or 'binomial'")
 
     # Pricing function using blackscholes
     def blackscholes_option_price(self, K=None, S=None, T=None, sigma=None, r=None, div=None):
@@ -216,7 +216,7 @@ class option:
             div = self.div
 
         if not self.is_european:
-            raise Exception("You cannot price american options using the blackscholes pricing model")
+            raise Exception("You cannot price american options using the blackscholes stockoption model")
         return blackscholes_price(self, K, S, T, sigma, r, div)
 
     # Pricing function using binomial tree
