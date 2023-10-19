@@ -1,5 +1,5 @@
 [project]
-name = "pyoptions"
+name = "stockoption"
 version = "1.0.5"
 authors = [
   { name = "Jonathan Hess", email = "yonikhess@gmail.com"},
