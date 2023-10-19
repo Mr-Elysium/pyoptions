@@ -1,6 +1,6 @@
 [project]
 name = "stockoption"
-version = "1.0.9"
+version = "1.0.10"
 authors = [
   { name = "Jonathan Hess", email = "yonikhess@gmail.com"},
 ]
