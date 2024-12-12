@@ -1,8 +1,8 @@
-# PyOptions
+# PyStockOptions
 
 ## Installation
 ```
-pip install pyoptions
+pip install pystockoptions
 ```
 
 This is a python package to price stock options.
